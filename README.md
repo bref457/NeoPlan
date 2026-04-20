@@ -1,49 +1,71 @@
 # NeoPlan
 
-Reminder-UI und Telegram-Daemon fuer [plan.neo457.ch](https://plan.neo457.ch).
+> Reminder-App mit Echtzeit-Telegram-Benachrichtigungen, betrieben auf eigenem VPS.
 
-Plaene und Reminder werden in PocketBase gespeichert. Ein Hintergrund-Daemon
-abonniert PocketBase Realtime, schedult faellige Reminder und sendet sie via
-Telegram.
+**Live:** [plan.neo457.ch](https://plan.neo457.ch)
+
+![Next.js](https://img.shields.io/badge/Next.js_15-black?logo=next.js) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) ![PocketBase](https://img.shields.io/badge/PocketBase-B8DBE4?logo=pocketbase&logoColor=black)
+
+---
+
+## Architektur
+
+```
+Next.js UI  →  PocketBase (SQLite)  →  Realtime-Daemon  →  Telegram
+```
+
+Reminder werden in PocketBase gespeichert. Der Daemon abonniert den Realtime-Stream, schedult fällige Einträge via `setTimeout` und sendet bei Fälligkeit eine Telegram-Nachricht.
 
 ## Stack
 
-- **Next.js 15** (App Router) + TypeScript
-- **PocketBase** als Backend / Datenbank
-- **Telegram Bot API** fuer Reminder-Zustellung
-- **PM2** fuer Daemon-Process-Management auf dem VPS
+| Layer | Technologie |
+|-------|------------|
+| Frontend | Next.js 15 (App Router) + TypeScript |
+| Datenbank | PocketBase (self-hosted, SQLite) |
+| Notifications | Telegram Bot API |
+| Process | PM2 (`plan-reminder`) |
 
 ## Setup
 
 ```bash
+git clone https://github.com/bref457/plan-app.git
+cd plan-app
 cp .env.example .env.local
-# .env.local mit echten Werten befuellen (PocketBase-URL, Telegram Bot Token, Chat-ID)
-
+# .env.local befüllen (siehe .env.example)
 npm install
 npm run dev
 ```
 
-App laeuft danach auf [http://localhost:3000](http://localhost:3000).
+### Umgebungsvariablen
 
-## Reminder-Daemon starten
-
-Der Daemon laeuft als eigener Node-Prozess (in Produktion via PM2):
-
-```bash
-node scripts/reminder-daemon.mjs
+```env
+NEXT_PUBLIC_PB_URL=https://your-pocketbase.example.com
+PB_URL=https://your-pocketbase.example.com
+TELEGRAM_BOT_TOKEN=1234567890:your-token-from-botfather
+TELEGRAM_CHAT_ID=123456789
 ```
 
-Der Daemon braucht alle drei Env-Vars (`PB_URL`, `TELEGRAM_BOT_TOKEN`,
-`TELEGRAM_CHAT_ID`). Fehlt eine davon, bricht er fail-fast ab.
-
-In Produktion via PM2:
+## Reminder-Daemon
 
 ```bash
-pm2 start scripts/reminder-daemon.mjs --name plan-reminder
+# Entwicklung
+node scripts/reminder-daemon.mjs
+
+# Produktion (PM2)
+pm2 start ecosystem.config.js
 pm2 save
 ```
 
+Fehlen Env-Vars → Daemon bricht sofort mit Fehler ab (fail-fast).
+
 ## Scripts
 
-- `scripts/reminder-daemon.mjs` — Long-running Daemon mit PocketBase Realtime + Telegram
-- `scripts/check-due-reminders.mjs` — One-shot Check faelliger Reminder (z. B. via Cron)
+| Script | Beschreibung |
+|--------|-------------|
+| `scripts/reminder-daemon.mjs` | Long-running Daemon, PocketBase Realtime + Telegram |
+| `scripts/check-due-reminders.mjs` | One-shot Check (z. B. via Cron) |
+
+## Verwandte Projekte
+
+- [neo457-landing](https://github.com/bref457/neo457-landing) — Portfolio-Showcase
+- [kinews](https://github.com/bref457/kinews) — KI-News-Aggregator
