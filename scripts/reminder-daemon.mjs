@@ -170,17 +170,23 @@ async function fireReminder(record) {
 
   try {
     await sendTelegram(msg, buttons);
-    await pb.collection('plans').update(record.id, { reminded: true });
-    log(`Fired: "${record.title}"`);
   } catch (err) {
-    log(`ERROR firing "${record.title}": ${err.message}`);
-    // Retry in 60s if Telegram failed
+    log(`ERROR sending Telegram for "${record.title}": ${err.message}`);
+    // Retry in 60s only if Telegram failed
     const t = setTimeout(() => {
       timers.delete(record.id);
       fireReminder(record);
     }, 60_000);
     timers.set(record.id, t);
     return;
+  }
+
+  try {
+    await pb.collection('plans').update(record.id, { reminded: true });
+    log(`Fired: "${record.title}"`);
+  } catch (err) {
+    // Record gone (deleted/not found) — abort silently, don't retry
+    log(`WARN: Could not mark "${record.title}" as reminded (${err.message}) — skipping`);
   }
   timers.delete(record.id);
 }

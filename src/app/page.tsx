@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import pb, { Plan } from "@/lib/pb";
 
 type FormState = {
@@ -22,7 +22,7 @@ function toFormState(plan: Plan): FormState {
 }
 
 const initialForm: FormState = {
-  type: "event",
+  type: "reminder",
   title: "",
   date: "",
   time: "",
@@ -47,8 +47,11 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const loadingRef = useRef(false);
 
   async function loadPlans() {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     setError("");
 
@@ -62,11 +65,19 @@ export default function HomePage() {
       setError("Fehler beim Laden");
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }
 
   useEffect(() => {
     loadPlans();
+    pb.collection("plans").subscribe("*", () => {
+      loadPlans();
+    });
+    return () => {
+      pb.collection("plans").unsubscribe("*");
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -145,18 +156,28 @@ export default function HomePage() {
     <main className="max-w-2xl mx-auto p-4 pt-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold tracking-tight">NeoPlan</h1>
-        <button
-          onClick={() => {
-            if (showForm) {
-              cancelForm();
-            } else {
-              setShowForm(true);
-            }
-          }}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-        >
-          {showForm ? "Abbrechen" : "+ Neu"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadPlans}
+            disabled={loading}
+            title="Aktualisieren"
+            className={`text-gray-400 hover:text-white p-2 rounded-lg transition text-lg ${loading ? "animate-spin" : ""}`}
+          >
+            ↻
+          </button>
+          <button
+            onClick={() => {
+              if (showForm) {
+                cancelForm();
+              } else {
+                setShowForm(true);
+              }
+            }}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+          >
+            {showForm ? "Abbrechen" : "+ Neu"}
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-red-400 mb-4 text-sm">{error}</p>}
@@ -171,9 +192,10 @@ export default function HomePage() {
                 onChange={(e) => setForm({ ...form, type: e.target.value as "event" | "reminder" })}
                 className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm border border-gray-700 focus:outline-none focus:border-indigo-500"
               >
-                <option value="event">Event</option>
-                <option value="reminder">Reminder</option>
+                <option value="reminder">🔔 Erinnerung</option>
+                <option value="event">📅 Termin</option>
               </select>
+              {form.type === "reminder" && <p className="text-xs text-gray-600 mt-1">Erinnerung = Telegram-Alarm</p>}
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Zeit (optional)</label>
@@ -274,7 +296,7 @@ function Section({
               <p className="text-xs text-gray-500 mt-0.5">
                 {formatDate(plan.date)}
                 {plan.time && ` • ${plan.time}`}
-                {plan.type && ` • ${plan.type}`}
+                {plan.type && ` • ${plan.type === "reminder" ? "🔔" : "📅"}`}
               </p>
               {plan.notes && <p className="text-xs text-gray-400 mt-1">{plan.notes}</p>}
             </div>
